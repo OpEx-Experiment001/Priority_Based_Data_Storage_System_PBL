@@ -1,0 +1,55 @@
+# Python virtual environments
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# IDE settings
+.vscode/
+.idea/
+
+# Logs
+logs/
+*.log
+
+# SQLite database files
+*.db
+*.sqlite
+*.sqlite3
+
+# MySQL database files and exports
+*.ibd
+*.ibdata*
+*.myd
+*.myi
+*.sql.gz
+database_backup.sql
+priority_storage_backup.sql
+
+# Python test and coverage files
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build artifacts
+build/
+backend/db_pending_patch.txt
+dist/
+*.egg-info/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary development patch
+backend/db_pending_patch.txt
