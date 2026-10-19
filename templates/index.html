@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Priority-Based Data Storage System</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <div><div class="eyebrow">OS + DBMS PROJECT</div><h1>Priority-Based Data Storage System</h1></div>
+  <div class="status-pill"><span id="dbDot" class="dot"></span><span id="dbStatus">Checking database…</span></div>
+</header>
+<main>
+  <section class="panel">
+    <div class="section-heading"><div><h2>Serial port selection</h2><p>Discover available ports, select one or more, then connect.</p></div><button id="refreshPorts" class="secondary">↻ Refresh ports</button></div>
+    <div id="portList" class="port-list"><div class="muted">Searching for serial ports…</div></div>
+    <div class="controls"><label for="baudRate">Baud rate</label><select id="baudRate" disabled><option>9600 (configured in .env)</option></select><button id="connectBtn">Connect selected ports</button><button id="disconnectBtn" class="secondary">Disconnect all</button></div>
+    <p class="hint">Close Arduino IDE Serial Monitor and other apps using the selected port before connecting. The app currently reads newline-delimited messages such as <code>{101,28.4,64.9,554,28.5}</code>.</p>
+    <div id="portMessage" class="notice" aria-live="polite"></div>
+  </section>
+  <section class="metrics">
+    <article class="metric"><span>Records received</span><strong id="totalRecords">—</strong></article>
+    <article class="metric"><span>Pending queue</span><strong id="queueDepth">—</strong></article>
+    <article class="metric"><span>Active workers</span><strong id="workers">—</strong></article>
+    <article class="metric"><span>Connected ports</span><strong id="connectedCount">—</strong></article>
+  </section>
+  <section class="panel">
+    <div class="section-heading"><div><h2>Priority distribution</h2><p>Priorities are assigned by the backend, not the Arduino.</p></div><button id="demoBtn" class="secondary">Insert demo record</button></div>
+    <div class="priority-grid">
+      <div class="priority-card high"><span>HIGH</span><strong id="highCount">0</strong></div>
+      <div class="priority-card medium"><span>MEDIUM</span><strong id="mediumCount">0</strong></div>
+      <div class="priority-card low"><span>LOW</span><strong id="lowCount">0</strong></div>
+    </div>
+  </section>
+  <section class="panel">
+    <div class="section-heading"><div><h2>Recent records</h2><p>Newest records first. Refreshes automatically.</p></div><button id="refreshData" class="secondary">Refresh data</button></div>
+    <div class="table-wrap"><table><thead><tr><th>ID</th><th>Module</th><th>Port</th><th>Values</th><th>Priority</th><th>Process status</th><th>Attempts</th><th>Received at</th></tr></thead><tbody id="recordsBody"><tr><td colspan="8" class="muted">Loading records…</td></tr></tbody></table></div>
+  </section>
+  <section class="panel">
+    <div class="section-heading"><div><h2>System events</h2><p>Connection, ingestion, scheduling and processing messages.</p></div></div>
+    <div id="eventLog" class="event-log"><div class="muted">Waiting for events…</div></div>
+  </section>
+  <footer>Local development interface · Configure credentials in <code>.env</code> before use.</footer>
+</main>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
