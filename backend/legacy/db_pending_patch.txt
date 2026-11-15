@@ -1,0 +1,1 @@
+See README: add fetch_pending_records() and get_attempt_count() methods to backend/db.py in the next iteration; included in the project source in current version below.
