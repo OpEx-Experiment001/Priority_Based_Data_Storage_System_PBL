@@ -1,48 +1,564 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Priority-Based Data Storage System</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <title>PBDS | Priority-Based Telemetry &amp; Storage Engine</title>
+  <script>
+    const savedTheme = localStorage.getItem("pbds-theme");
+    if (savedTheme === "light" || savedTheme === "dark") {
+      document.documentElement.dataset.theme = savedTheme;
+    }
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/aws_style.css') }}">
 </head>
+
 <body>
-<header class="topbar">
-  <div><div class="eyebrow">OS + DBMS PROJECT</div><h1>Priority-Based Data Storage System</h1></div>
-  <div class="status-pill"><span id="dbDot" class="dot"></span><span id="dbStatus">Checking database…</span></div>
-</header>
-<main>
-  <section class="panel">
-    <div class="section-heading"><div><h2>Serial port selection</h2><p>Discover available ports, select one or more, then connect.</p></div><button id="refreshPorts" class="secondary">↻ Refresh ports</button></div>
-    <div id="portList" class="port-list"><div class="muted">Searching for serial ports…</div></div>
-    <div class="controls"><label for="baudRate">Baud rate</label><select id="baudRate" disabled><option>9600 (configured in .env)</option></select><button id="connectBtn">Connect selected ports</button><button id="disconnectBtn" class="secondary">Disconnect all</button></div>
-    <p class="hint">Close Arduino IDE Serial Monitor and other apps using the selected port before connecting. The app currently reads newline-delimited messages such as <code>{101,28.4,64.9,554,28.5}</code>.</p>
-    <div id="portMessage" class="notice" aria-live="polite"></div>
-  </section>
-  <section class="metrics">
-    <article class="metric"><span>Records received</span><strong id="totalRecords">—</strong></article>
-    <article class="metric"><span>Pending queue</span><strong id="queueDepth">—</strong></article>
-    <article class="metric"><span>Active workers</span><strong id="workers">—</strong></article>
-    <article class="metric"><span>Connected ports</span><strong id="connectedCount">—</strong></article>
-  </section>
-  <section class="panel">
-    <div class="section-heading"><div><h2>Priority distribution</h2><p>Priorities are assigned by the backend, not the Arduino.</p></div><button id="demoBtn" class="secondary">Insert demo record</button></div>
-    <div class="priority-grid">
-      <div class="priority-card high"><span>HIGH</span><strong id="highCount">0</strong></div>
-      <div class="priority-card medium"><span>MEDIUM</span><strong id="mediumCount">0</strong></div>
-      <div class="priority-card low"><span>LOW</span><strong id="lowCount">0</strong></div>
+
+  <!-- AWS Top Navigation Bar -->
+  <header class="aws-topbar">
+    <div class="topbar-left">
+      <div class="brand-icon">PBDS</div>
+      <div class="brand-title">Priority Storage <span class="brand-subtitle">IoT Telemetry Node</span></div>
     </div>
-  </section>
-  <section class="panel">
-    <div class="section-heading"><div><h2>Recent records</h2><p>Newest records first. Refreshes automatically.</p></div><button id="refreshData" class="secondary">Refresh data</button></div>
-    <div class="table-wrap"><table><thead><tr><th>ID</th><th>Module</th><th>Port</th><th>Values</th><th>Priority</th><th>Process status</th><th>Attempts</th><th>Received at</th></tr></thead><tbody id="recordsBody"><tr><td colspan="8" class="muted">Loading records…</td></tr></tbody></table></div>
-  </section>
-  <section class="panel">
-    <div class="section-heading"><div><h2>System events</h2><p>Connection, ingestion, scheduling and processing messages.</p></div></div>
-    <div id="eventLog" class="event-log"><div class="muted">Waiting for events…</div></div>
-  </section>
-  <footer>Local development interface · Configure credentials in <code>.env</code> before use.</footer>
-</main>
-<script src="{{ url_for('static', filename='app.js') }}"></script>
+    <div class="topbar-right">
+      <div class="ws-status-badge">
+        <span id="wsDot" class="status-dot"></span>
+        <span id="wsText">CONNECTING...</span>
+      </div>
+      <button id="themeToggle" class="btn btn-secondary btn-sm theme-toggle" type="button"
+        aria-label="Switch to light mode" title="Switch to light mode">
+        <span class="theme-icon" aria-hidden="true">☼</span>
+        <span class="theme-label">Light mode</span>
+      </button>
+      <div class="user-profile-pill">
+        <span id="navUserName">Not Logged In</span>
+        <span id="navUserRole" class="role-tag">GUEST</span>
+      </div>
+      <button id="logoutBtn" class="btn btn-secondary btn-sm">Log out</button>
+    </div>
+  </header>
+
+  <!-- AWS Layout Container -->
+  <div class="aws-container">
+
+    <!-- Sidebar Navigation -->
+    <aside class="aws-sidebar">
+      <div class="nav-section-title">Console Architecture</div>
+      <div class="nav-item active" data-tab="all">🖥️ Monolithic Console</div>
+
+      <div class="nav-section-title">Telemetry &amp; Engine</div>
+      <div class="nav-item" data-tab="dashboard">📊 Dashboard</div>
+      <div class="nav-item" data-tab="records">📡 Records Explorer</div>
+      <div class="nav-item" data-tab="rules">⚙️ Priority Rules</div>
+      <div class="nav-item" data-tab="hardware">🔌 Hardware &amp; Ports</div>
+
+      <div class="nav-section-title">Security &amp; Governance</div>
+      <div class="nav-item" data-tab="iam">🔐 IAM &amp; RBAC</div>
+      <div class="nav-item" data-tab="events">📜 Live Event Stream</div>
+    </aside>
+
+    <!-- Main Content Workspace -->
+    <main class="aws-main">
+
+      <!-- =================================================================== -->
+      <!-- TAB 1: DASHBOARD OVERVIEW -->
+      <!-- =================================================================== -->
+      <section id="dashboardView" class="tab-view">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Telemetry Engine Overview</h1>
+            <p class="page-desc">Operating System Priority Queuing, Autoscaling Thread Pool, and Document Storage</p>
+          </div>
+          <div class="toolbar">
+            <button id="toggleVirtualBtn" class="btn btn-primary btn-sm">Start Virtual Telemetry</button>
+            <button id="burstDemoBtn" class="btn btn-secondary btn-sm">⚡ Ingest Burst (5)</button>
+          </div>
+        </div>
+
+        <div class="metrics-grid" style="margin-top: 1.5rem;">
+          <div class="metric-card">
+            <div class="metric-title">Storage Engine</div>
+            <div id="statStorageEngine" class="metric-value" style="font-size:20px; color:var(--aws-orange);">JSON
+              (NoSQL)</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-title">Active OS Workers</div>
+            <div id="statActiveWorkers" class="metric-value">—</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-title">Queue Depth (OS PQ)</div>
+            <div id="statQueueDepth" class="metric-value">—</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-title">Total Records Persisted</div>
+            <div id="statTotalRecords" class="metric-value">—</div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top: 1.5rem;">
+          <div class="panel-header">
+            <div class="panel-title">Priority Classification Distribution</div>
+          </div>
+          <div class="panel-body">
+            <div class="metrics-grid">
+              <div class="metric-card high">
+                <div class="metric-title">HIGH Priority (Urgent Spikes)</div>
+                <div id="countHigh" class="metric-value">0</div>
+              </div>
+              <div class="metric-card medium">
+                <div class="metric-title">MEDIUM Priority (Warnings)</div>
+                <div id="countMed" class="metric-value">0</div>
+              </div>
+              <div class="metric-card low">
+                <div class="metric-title">LOW Priority (Routine Telemetry)</div>
+                <div id="countLow" class="metric-value">0</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- TAB 2: RECORDS EXPLORER (Full Single, Batch, Whole CRUD) -->
+      <!-- =================================================================== -->
+      <section id="recordsView" class="tab-view" style="display:none;">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Records Explorer &amp; Batch Management</h1>
+            <p class="page-desc">Complete Single, Batch, and Whole Collection CRUD on NoSQL JSON Document Store</p>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-secondary btn-sm" onclick="downloadExport('json')">⬇ Export JSON</button>
+            <button class="btn btn-secondary btn-sm" onclick="downloadExport('zip')">📦 Export ZIP</button>
+            <button class="btn btn-danger btn-sm auditor-hidden" onclick="purgeRecords('COMPLETED')">Purge
+              Completed</button>
+            <button class="btn btn-danger btn-sm auditor-hidden" onclick="purgeRecords('')">Purge Whole
+              Database</button>
+          </div>
+        </div>
+
+        <!-- Filter & Batch Action Toolbar -->
+        <div class="panel" style="margin-top: 1.5rem;">
+          <div class="panel-header">
+            <div class="toolbar">
+              <label style="font-size:12px; color:var(--text-muted);">Status:</label>
+              <select id="filterStatus" class="form-control" style="width:130px; padding:4px 8px; font-size:12px;"
+                onchange="loadRecords()">
+                <option value="">All Statuses</option>
+                <option value="QUEUED">QUEUED</option>
+                <option value="PROCESSING">PROCESSING</option>
+                <option value="COMPLETED">COMPLETED</option>
+                <option value="FAILED">FAILED</option>
+                <option value="RETRY_WAIT">RETRY_WAIT</option>
+              </select>
+
+              <label style="font-size:12px; color:var(--text-muted); margin-left:10px;">Priority:</label>
+              <select id="filterPriority" class="form-control" style="width:130px; padding:4px 8px; font-size:12px;"
+                onchange="loadRecords()">
+                <option value="">All Priorities</option>
+                <option value="HIGH">HIGH</option>
+                <option value="MEDIUM">MEDIUM</option>
+                <option value="LOW">LOW</option>
+              </select>
+
+              <label style="font-size:12px; display:flex; align-items:center; gap:5px; margin-left:10px;">
+                <input type="checkbox" id="searchAllCheck" onchange="loadRecords()"> Search All Records
+              </label>
+            </div>
+
+            <!-- Batch Action Controls -->
+            <div class="toolbar">
+              <span id="selectedCountBadge" class="badge badge-queued">0 selected</span>
+              <button class="btn btn-danger btn-sm auditor-hidden" onclick="batchDeleteSelected()">Batch Delete</button>
+              <button class="btn btn-secondary btn-sm auditor-hidden" onclick="batchChangePriority('HIGH')">Set
+                High</button>
+              <button class="btn btn-secondary btn-sm auditor-hidden" onclick="batchChangePriority('LOW')">Set
+                Low</button>
+              <button class="btn btn-secondary btn-sm auditor-hidden" onclick="batchRequeueSelected()">Batch
+                Requeue</button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:30px;"><input type="checkbox" id="selectAllRecords"></th>
+                  <th>ID</th>
+                  <th>Module</th>
+                  <th>Values</th>
+                  <th>Priority</th>
+                  <th>Process Status</th>
+                  <th>Attempts</th>
+                  <th>Received</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="recordsTbody">
+                <tr>
+                  <td colspan="9" style="text-align:center; color: var(--text-muted); padding: 2rem;">Loading records...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Footer -->
+          <div id="paginationFooter"
+            style="padding: 0.75rem 1rem; font-size:12px; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center; border-top: 1px solid var(--border-color);">
+            <span id="paginationInfo">Showing 0 records</span>
+            <button class="btn btn-secondary btn-sm auditor-hidden" id="loadMoreBtn" onclick="loadMoreRecords()"
+              style="display:none;">Load More (+100)</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- TAB 3: DYNAMIC PRIORITY RULES -->
+      <!-- =================================================================== -->
+      <section id="rulesView" class="tab-view" style="display:none;">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Priority Classification Rules</h1>
+            <p class="page-desc">Dynamic rule thresholds evaluated against incoming telemetry without hardcoding</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openModal('createRuleModal')">+ Add Priority Rule</button>
+        </div>
+
+        <div class="panel" style="margin-top: 1.5rem;">
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Rule ID</th>
+                  <th>Target Module</th>
+                  <th>Sensor Metric</th>
+                  <th>Trigger Condition</th>
+                  <th>Assigned Priority</th>
+                  <th>Description</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="rulesTbody">
+                <tr>
+                  <td colspan="7" style="text-align:center; color: var(--text-muted); padding: 2rem;">Loading rules...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- TAB 4: HARDWARE & PORTS -->
+      <!-- =================================================================== -->
+      <section id="hardwareView" class="tab-view" style="display:none;">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Hardware &amp; Serial Interface</h1>
+            <p class="page-desc">Physical COM serial devices and Sandboxed Virtual Telemetry Generator</p>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="loadPorts()">↻ Refresh Ports</button>
+        </div>
+
+        <div class="panel" style="margin-top: 1.5rem;">
+          <div class="panel-header">
+            <div class="panel-title">Physical Serial Ports (Arduino USB)</div>
+          </div>
+          <div class="panel-body">
+            <div id="portListContainer">Searching for ports...</div>
+            <p style="font-size:12px; color:var(--text-muted); margin-top:10px;">
+              Configured Baud: <strong>9600</strong>. Supported format: <code>{101,28.4,64.9,554,28.5}</code>.
+            </p>
+            <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+              <button class="btn btn-primary btn-sm" onclick="connectSelectedPorts()">⚡ Connect Selected Ports</button>
+              <button class="btn btn-danger btn-sm" onclick="disconnectAllPorts()">✖ Disconnect All Ports</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top: 1.5rem;">
+          <div class="panel-header">
+            <div class="panel-title">Sandboxed Virtual Microcontroller Simulator</div>
+          </div>
+          <div class="panel-body">
+            <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">
+              Runs in-memory inside the Python virtual machine without accessing physical COM hardware, safely
+              generating realistic environmental &amp; motion sensor packets.
+            </p>
+            <button class="btn btn-primary btn-sm" onclick="toggleVirtualHardware()">Toggle Simulator Running
+              State</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- TAB 5: IAM & RBAC CONSOLE -->
+      <!-- =================================================================== -->
+      <section id="iamView" class="tab-view" style="display:none;">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Identity &amp; Access Management (IAM)</h1>
+            <p class="page-desc">Role-Based Access Control (RBAC), User Policies, and Single/Batch CRUD</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openModal('createUserModal')">+ Create IAM User</button>
+        </div>
+
+        <div class="panel" style="margin-top: 1.5rem;">
+          <div class="panel-header">
+            <div class="panel-title">Registered IAM Users</div>
+          </div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Assigned Role</th>
+                  <th>Status</th>
+                  <th>Created Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="usersTbody">
+                <tr>
+                  <td colspan="5" style="text-align:center; color: var(--text-muted); padding: 2rem;">Loading users...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- User Groups Panel -->
+        <div class="panel" style="margin-top: 1.5rem;">
+          <div class="panel-header">
+            <div class="panel-title">User Groups</div>
+            <button class="btn btn-primary btn-sm" onclick="openModal('createGroupModal')">+ Create Group</button>
+          </div>
+          <div id="groupsContainer" class="panel-body" style="font-size:13px;">Loading groups...</div>
+        </div>
+
+        <div class="panel" style="margin-top: 1.5rem;">
+          <div class="panel-header">
+            <div class="panel-title">Role-Based Access Control (RBAC) Policy Matrix</div>
+          </div>
+          <div class="panel-body" style="font-size:13px; line-height: 1.6;">
+            <p><strong>SUPERADMIN</strong>: Full unrestricted access including user management and system configuration.
+            </p>
+            <p><strong>ADMIN</strong>: Full access (Single/Batch/Purge Records, Manage Users, Dynamic Rules, Hardware
+              Ports, Workers).</p>
+            <p><strong>OPERATOR</strong>: Operational access (Read/Create Records, Batch Delete, Hardware Ports, View
+              Rules).</p>
+            <p><strong>AUDITOR</strong>: Read-only access (Inspect Records, View Logs, View Users).</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- TAB 6: LIVE EVENT STREAM -->
+      <!-- =================================================================== -->
+      <section id="eventsView" class="tab-view" style="display:none;">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Real-Time Event Stream</h1>
+            <p class="page-desc">Server-Sent Events (SSE) live telemetry frames, OS scheduling logs, and audit events
+            </p>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top: 1.5rem;">
+          <div class="panel-body">
+            <div id="liveEventFeed" class="event-feed">
+              <div class="feed-item"><span class="feed-time">System</span><span class="feed-msg">SSE stream listener
+                  active. Connecting to /api/events/stream...</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- MODALS -->
+  <!-- ======================================================================= -->
+
+  <!-- Login Modal -->
+  <div id="loginModal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">AWS Console Login</div>
+        <button id="loginThemeToggle" class="btn btn-secondary btn-sm theme-toggle modal-theme-toggle" type="button"
+          aria-label="Switch to light mode" title="Switch to light mode">
+          <span class="theme-icon" aria-hidden="true">☼</span>
+          <span class="theme-label">Light mode</span>
+        </button>
+      </div>
+      <form id="loginForm">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="loginUser" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="loginPass" class="form-control" required>
+          </div>
+          <p style="font-size:12px; color:var(--text-muted);">
+            Sign in with your credentials, or create the first account below.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Sign In</button>
+        </div>
+      </form>
+      <!-- Signup link -->
+      <p style="text-align:center; margin-top:12px; font-size:12px; color:var(--text-muted); padding-bottom:8px;">
+        No account? <a href="#" onclick="showSignupForm()" style="color:var(--aws-orange);">Create first account</a>
+      </p>
+      <!-- Signup section (hidden by default) -->
+      <div id="signupSection"
+        style="display:none; margin:0 1.5rem 1.5rem; border-top:1px solid var(--border-color); padding-top:12px;">
+        <h4 style="color:var(--text-primary); margin-bottom:8px;">Create Account</h4>
+        <form id="signupForm">
+          <div class="form-group"><label>Username</label><input type="text" id="signupUser" class="form-control"
+              required></div>
+          <div class="form-group"><label>Password</label><input type="password" id="signupPass" class="form-control"
+              required></div>
+          <button type="submit" class="btn btn-primary" style="width:100%;">Create Account</button>
+        </form>
+        <p style="font-size:11px; color:var(--aws-orange); margin-top:8px;">First account created gets full SUPERADMIN
+          access.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create User Modal -->
+  <div id="createUserModal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">Create New IAM User</div>
+        <button class="modal-close" onclick="closeModal('createUserModal')">&times;</button>
+      </div>
+      <form id="createUserForm">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="newUsername" class="form-control" required placeholder="e.g. dev_operator">
+          </div>
+          <div class="form-group">
+            <label>Password (min 6 characters)</label>
+            <input type="password" id="newPassword" class="form-control" required placeholder="••••••••">
+          </div>
+          <div class="form-group">
+            <label>Assigned IAM Role</label>
+            <select id="newUserRole" class="form-control">
+              <option value="OPERATOR">OPERATOR</option>
+              <option value="AUDITOR">AUDITOR</option>
+              <option value="ADMIN">ADMIN</option>
+              <option value="SUPERADMIN">SUPERADMIN</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('createUserModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create User</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Create Group Modal -->
+  <div id="createGroupModal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">Create User Group</div>
+        <button class="modal-close" onclick="closeModal('createGroupModal')">&times;</button>
+      </div>
+      <form id="createGroupForm">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Group Name</label>
+            <input type="text" id="newGroupName" class="form-control" required placeholder="e.g. data-analysts">
+          </div>
+          <div class="form-group">
+            <label>Permissions (comma-separated)</label>
+            <input type="text" id="newGroupPerms" class="form-control" placeholder="e.g. records:read,records:create">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('createGroupModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Group</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Create Rule Modal -->
+  <div id="createRuleModal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">Add Dynamic Priority Rule</div>
+        <button class="modal-close" onclick="closeModal('createRuleModal')">&times;</button>
+      </div>
+      <form id="createRuleForm">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Target Module ID</label>
+            <input type="number" id="ruleModuleId" class="form-control" value="101" required>
+          </div>
+          <div class="form-group">
+            <label>Sensor Reading Index (0-based)</label>
+            <input type="number" id="ruleSensorIndex" class="form-control" value="2" required>
+          </div>
+          <div class="form-group">
+            <label>Sensor Metric Label</label>
+            <input type="text" id="ruleSensorName" class="form-control" value="Gas PPM" required>
+          </div>
+          <div class="form-group">
+            <label>Operator</label>
+            <select id="ruleOperator" class="form-control">
+              <option value=">=">&gt;= (Greater or Equal)</option>
+              <option value=">">&gt; (Strictly Greater)</option>
+              <option value="<=">&lt;= (Less or Equal)</option>
+              <option value="<">&lt; (Strictly Less)</option>
+              <option value="==">== (Exact Match)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Threshold Value</label>
+            <input type="number" step="0.1" id="ruleThreshold" class="form-control" value="750.0" required>
+          </div>
+          <div class="form-group">
+            <label>Assigned Priority</label>
+            <select id="rulePriority" class="form-control">
+              <option value="HIGH">HIGH (Urgent Spikes)</option>
+              <option value="MEDIUM">MEDIUM (Elevated Warnings)</option>
+              <option value="LOW">LOW (Standard)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Description / Alert Note</label>
+            <input type="text" id="ruleDesc" class="form-control" placeholder="Hazardous threshold alert">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('createRuleModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Rule</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer"></div>
+
+  <!-- Scripts -->
+  <script src="{{ url_for('static', filename='js/sse_client.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
+
 </html>
