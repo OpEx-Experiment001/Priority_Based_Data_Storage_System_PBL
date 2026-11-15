@@ -53,3 +53,8 @@ desktop.ini
 
 # Temporary development patch
 backend/db_pending_patch.txt
+
+# Local JSON document data store
+data_store/
+*.exe
+*.o
